@@ -5,8 +5,8 @@ import jwt from "jsonwebtoken";
 const userSchema = new Schema(
   {
     username: {
-      type: Boolean,
-      requried: true,
+      type: String,
+      required: true,
       unique: true,
       lowercase: true,
       trim: true,
@@ -14,14 +14,14 @@ const userSchema = new Schema(
     },
     email: {
       type: String,
-      requried: true,
+      required: true,
       unique: true,
       lowercase: true,
       trim: true,
     },
     password: {
       type: String,
-      requried: true,
+      required: true,
       trim: true,
     },
     profile_photo: {
@@ -43,10 +43,15 @@ const userSchema = new Schema(
   { timestamps: true },
 );
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-  this.password = bcrypt.hash(this.password, 10);
-  next();
+// userSchema.pre("save", async function (next) {
+//   if (!this.isModified("password")) return next();
+//   this.password = bcrypt.hash(this.password, 10);
+//   next();
+// });
+
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 userSchema.methods.isPasswordMatch = async function (password) {
@@ -62,7 +67,7 @@ userSchema.methods.generateAccessToken = async function () {
     },
     process.env.ACCESSTOKEN_SECRET_KEY,
     {
-      expiresIn: ACCESSTOKEN_EXP_TIME,
+      expiresIn: process.env.ACCESSTOKEN_EXP_TIME,
     },
   );
 };
@@ -74,7 +79,7 @@ userSchema.methods.generateRefreshToken = async function () {
     },
     process.env.REFRESH_TOKEN_SECRET_KEY,
     {
-      expiresIn: REFRESH_TOKEN_EXP_TIME,
+      expiresIn: process.env.REFRESH_TOKEN_EXP_TIME,
     },
   );
 };
