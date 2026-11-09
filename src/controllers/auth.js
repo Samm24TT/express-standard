@@ -1,6 +1,7 @@
 import { uploadFileToCloudinary } from "../utils/cloudinary.js";
 import { User } from "../models/user.js";
 import fs from "fs";
+import jwt from "jsonwebtoken";
 
 export const registerController = async (req, res) => {
   const { username, email, password } = req.body;
@@ -68,8 +69,8 @@ const generateAccessTokenAndRefreshToken = async (userId) => {
       return res.status(404).json({ message: "No User found!" });
     }
 
-    const accessToken = existingUser.generateAccessToken();
-    const refreshToken = existingUser.generateRefreshToken();
+    const accessToken = await existingUser.generateAccessToken();
+    const refreshToken = await existingUser.generateRefreshToken();
 
     existingUser.refresh_token = refreshToken;
     await existingUser.save({ validateBeforeSave: false });
@@ -134,11 +135,11 @@ export const generateNewRefreshToken = async (req, res) => {
 
   try {
     const decodedToken = jwt.verify(
-      refreshToken,
+      incomingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET_KEY,
     );
 
-    const existingUser = User.findById(decodedToken?._id);
+    const existingUser = await User.findById(decodedToken?._id);
     if (!existingUser) {
       return res.status(404).json({ message: "No User found!" });
     }
@@ -161,6 +162,39 @@ export const generateNewRefreshToken = async (req, res) => {
       .cookie("refreshToken", refreshToken, options)
       .json({
         message: "Token Updated.",
+      });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Something went wrong." });
+  }
+};
+
+export const logoutController = async (req, res) => {
+  if (!req.user || !req.user._id) {
+    return res.status(400).json({ message: "Unauthorized." });
+  }
+
+  try {
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $unset: {
+          refresh_token: 1,
+        },
+      },
+      { new: true },
+    );
+    const options = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    };
+
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json({
+        message: `${req.user.username} logout successfully.`,
       });
   } catch (error) {
     console.log(error);
